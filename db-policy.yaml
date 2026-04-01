@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-db
+  # namespace는 kustomization.yaml에서 일괄 적용하므로 생략합니다.
+spec:
+  podSelector:
+    matchLabels:
+      app: mariadb # 이 정책을 적용할 대상 (DB)
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: web # 오직 web 라벨이 붙은 포드만 허용
+    ports:
+    - protocol: TCP
+      port: 3306

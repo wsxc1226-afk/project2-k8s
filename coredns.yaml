@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: coredns-external
+  namespace: kube-system
+  annotations:
+    # MetalLB에게 이 번호(100번)를 DNS 전용으로 고정하라고 명령
+    #metallb.universe.tf/loadBalancerIPs: 10.20.0.100
+    metallb.universe.tf/loadBalancerIPs: 172.16.20.200
+spec:
+  type: LoadBalancer
+  selector:
+    # 기존 실행 중인 coredns 포드들을 찾아 연결
+    k8s-app: kube-dns
+  ports:
+    - name: dns-udp
+      port: 53
+      protocol: UDP
+      targetPort: 53
+    - name: dns-tcp
+      port: 53
+      protocol: TCP
+      targetPort: 53

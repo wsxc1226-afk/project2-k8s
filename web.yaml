@@ -1,0 +1,121 @@
+# [1] 설정 보관함: HTML 및 Nginx 경로 설정
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-content
+  namespace: infra
+data:
+  # 메인 페이지
+  index.html: |
+    <!DOCTYPE html><html lang="ko"><head>
+      <meta charset="UTF-8" /><title>Edge A Research Lab</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Pretendard", Arial, sans-serif; }
+        body { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; line-height: 1.6; }
+        header { padding: 80px 20px; text-align: center; }
+        header h1 { font-size: 3rem; margin-bottom: 10px; }
+        header p { font-size: 1.2rem; opacity: 0.85; }
+        section { max-width: 1000px; margin: 60px auto; padding: 0 20px; }
+        .card { background: rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 30px; margin-bottom: 30px; backdrop-filter: blur(10px); transition: transform 0.3s ease; }
+        .card:hover { transform: translateY(-6px); background: rgba(255, 255, 255, 0.12); }
+        h2 { margin-bottom: 15px; font-size: 1.8rem; }
+        .btn { display: inline-block; margin-top: 20px; padding: 12px 28px; border-radius: 30px; background: #00c6ff; color: #003344; font-weight: bold; text-decoration: none; transition: background 0.3s ease; }
+        .btn:hover { background: #4dd9ff; }
+        footer { text-align: center; padding: 40px 20px; font-size: 0.9rem; opacity: 0.7; }
+      </style></head><body>
+      <header><h1>Edge A Research Lab</h1><p>Network · Security · Edge Computing</p></header>
+      <section>
+        <div class="card"><h2>연구실 소개</h2><p>Edge A 연구실은 네트워크, 보안, 엣지 컴퓨팅을 중심으로 실험적이고 실무 지향적인 연구를 수행합니다.</p></div>
+        <div class="card"><h2>Edge A 철학</h2><p>“현실에서 굴러가는 구조를 만든다.”</p>
+          <a href="/about" class="btn">상세 소개 보기</a>
+        </div>
+      </section><footer>© 2026 Edge A Research Lab</footer></body></html>
+
+  # 상세 소개 페이지
+  about.html: |
+    <!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8" /><title>About - Edge A Lab</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Pretendard", Arial, sans-serif; }
+        body { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; line-height: 1.6; padding: 50px; text-align: center; }
+        .card { max-width: 800px; margin: auto; background: rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 40px; backdrop-filter: blur(10px); }
+        h1 { color: #00c6ff; margin-bottom: 20px; }
+        .btn { display: inline-block; margin-top: 30px; padding: 10px 20px; background: #fff; color: #003344; text-decoration: none; border-radius: 20px; font-weight: bold; }
+      </style></head><body><div class="card"><h1>상세 소개 페이지</h1>
+      <p>이 페이지는 경로 기반 라우팅 테스트를 위해 생성되었습니다.<br>현재 <b>www.edgea.lab/about</b> 경로로 접속 중입니다.</p>
+      <a href="/" class="btn">메인으로 돌아가기</a></div></body></html>
+
+  # [핵심] Nginx 경로 매핑 설정 (404 방지)
+  default.conf: |
+    server {
+        listen 80;
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+        location /about {
+            alias /usr/share/nginx/html;
+            index about.html;
+            try_files $uri $uri/ /about.html;
+        }
+    }
+
+---
+# [2] Nginx 배포 (Deployment)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: infra
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        volumeMounts:
+        - name: html-storage
+          mountPath: /usr/share/nginx/html
+        - name: config-storage
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+      volumes:
+      - name: html-storage
+        configMap:
+          name: web-content
+          items:
+          - key: index.html
+            path: index.html
+          - key: about.html
+            path: about.html
+      - name: config-storage
+        configMap:
+          name: web-content
+          items:
+          - key: default.conf
+            path: default.conf
+
+---
+# [3] 웹 서비스 고정 IP (10.20.0.100) 설정 -> change!!
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-svc
+  annotations:
+    #metallb.universe.tf/loadBalancerIPs: 10.20.0.200
+    metallb.universe.tf/loadBalancerIPs: 172.16.20.201
+  namespace: infra
+spec:
+  type: LoadBalancer
+  selector:
+    app: web
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

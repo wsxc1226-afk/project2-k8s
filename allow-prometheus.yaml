@@ -1,0 +1,14 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-access
+  namespace: infra
+spec:
+  podSelector: {} # infra 네임스페이스의 모든 팟 대상
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring # monitoring 네임스페이스에서 오는 것만 허용
